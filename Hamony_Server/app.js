@@ -101,7 +101,7 @@ var Bulletin_Schema = new Schema({
     select: Number, // 자유 발언 1 | 찬반 토론 2 | 투표 3
     likejoin: [String]
     , like: Number, // 공감 수
-    tag: String, // 태그
+    tag: [String], // 태그
     img: String, // 이미지
     settime: Date, // 종료 시간
     votejoin: [String]
@@ -123,10 +123,20 @@ app.post('/login', function (req, res) {
         }, function (e, db_RESULT) {
             if (e)
                 throw e;
-            else if (db_RESULT.pw == req.query.pw) {
+            else if (db_RESULT == null) {
+                console.log("[로그인] 존재하지 않는 계정");
+                res.send({
+                    "error": "login_none"
+                });
+            } else if (db_RESULT.pw == req.query.pw) {
                 //로그인 성공
                 console.log("[로그인]" + db_RESULT.name);
                 res.send(JSON.stringify(db_RESULT));
+            } else if (db_RESULT.pw != req.query.pw) {
+                console.log("[로그인] 비밀번호 틀림");
+                res.send({
+                    "error": "login_notpw"
+                });
             }
         });
     } else {
@@ -203,21 +213,36 @@ app.post('/bulletinlist', function (req, res) {
         BULLETIN_DATABASE.find({}).sort({
             date: -1
         }).limit(20).exec(function (e, db_RESULT) {
-            res.send(JSON.stringify(db_RESULT));
+            if (db_RESULT == null) {
+                res.send({
+                    "list": null
+                });
+            } else
+                res.send(JSON.stringify(db_RESULT));
         });
     } else if (req.query.please == 2) { // 핫 스팟
         console.log("[리스트 요청] 핫스팟");
         BULLETIN_DATABASE.find({}).sort({
             click: -1
         }).limit(20).exec(function (e, db_RESULT) {
-            res.send(JSON.stringify(db_RESULT));
+            if (db_RESULT == null) {
+                res.send({
+                    "list": null
+                });
+            } else
+                res.send(JSON.stringify(db_RESULT));
         });
     } else if (req.query.please == 3) { // 진행률
         console.log("[리스트 요청] 진행률");
         BULLETIN_DATABASE.find({}).sort({
             current: -1
         }).limit(20).exec(function (e, db_RESULT) {
-            res.send(JSON.stringify(db_RESULT));
+            if (db_RESULT == null) {
+                res.send({
+                    "list": null
+                });
+            } else
+                res.send(JSON.stringify(db_RESULT));
         });
     }
 });
@@ -226,13 +251,16 @@ app.post('/clicked', function (req, res) {
     BULLETIN_DATABASE.findOne({
         id: req.query.bulletinid
     }, function (e, db_RESULT) {
-        if(e)
+        if (e)
             throw e;
-        else if(db_RESULT != null){
+        else if (db_RESULT != null) {
             ++db_RESULT.click;
-            db_RESULT.save(function(e){
+            db_RESULT.save(function (e) {
                 if (e)
                     throw e;
+            });
+            res.send({
+                "sucess": "clear"
             });
         }
     });
@@ -255,10 +283,10 @@ app.post('/writebulletin', function (req, res) {
                 current: 0, // 진행 정도
                 select: parseInt(req.query.bulletinselect), // 자유 발언 1 | 찬반 토론 2 | 투표 3
                 like: 0, // 공감 수
-                tag: req.query.tag, // 태그
+                tag: req.query.tag.split(','), // 태그
                 //img: filePath, // 이미지
                 //settime: req.query.exittime, // 종료 시간
-                vote: new Array[2], //투표 수  vote[0] == 찬성 | vote[1] == 반대
+                vote: new Array(0,0), //투표 수  vote[0] == 찬성 | vote[1] == 반대
                 comment: null // 댓글
             });
             data.save(function (e) {
