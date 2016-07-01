@@ -20,28 +20,29 @@ var done = false;
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
 app.use(logger('dev'));
-app.use(bodyParser.json());
+app.use(bodyParser());
 app.use(bodyParser.urlencoded({
-    extended: false
+    extended: true
 }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 
+
 //app.use(multer());
-    /*{
-    dest: './image/'
-    , rename: function (fieldname, filename) {
-        return Date.now();
-    }
-    , onFileUploadStart: function (file) {
-        console.log(file.originalname + ' is starting ...');
-    }
-    , onFileUploadComplete: function (file) {
-        console.log(file.fieldname + ' uploaded to  ' + file.path);
-    }
-    }
-    */
+/*{
+dest: './image/'
+, rename: function (fieldname, filename) {
+    return Date.now();
+}
+, onFileUploadStart: function (file) {
+    console.log(file.originalname + ' is starting ...');
+}
+, onFileUploadComplete: function (file) {
+    console.log(file.fieldname + ' uploaded to  ' + file.path);
+}
+}
+*/
 
 //DB 설정
 mongoose.connect("mongodb://localhost/Hamony");
@@ -108,101 +109,133 @@ var Bulletin_Schema = new Schema({
 });
 
 // DATABASE 선언
-var USER_DATABASE = mongoose.model('User', User_Schema);
-var BULLETIN_DATABASE = mongoose.model('Bulletin', Bulletin_Schema);
-var COMMENT_DATABASE = mongoose.model('Comment', Comment_Schema);
-var OPINION_DATABASE = mongoose.model('Opinion', Opinion_Schema);
+var USER_DATABASE = mongoose.model('User', User_Schema, "User");
+var BULLETIN_DATABASE = mongoose.model('Bulletin', Bulletin_Schema, "Bulletin");
+var COMMENT_DATABASE = mongoose.model('Comment', Comment_Schema, "Comment");
+var OPINION_DATABASE = mongoose.model('Opinion', Opinion_Schema, "Opinion");
 
 //로그인 요청
 app.post('/login', function (req, res) {
-    if (req.body.id && req.body.pw) {
+    if (req.query.id && req.query.pw) {
         //DB에서 검색합니다. >> 아이디가 존재 하는가?
         USER_DATABASE.findOne({
-            id: req.body.id
+            id: req.query.id
         }, function (e, db_RESULT) {
             if (e)
                 throw e;
-            else if (db_RESULT.pw == req.body.pw) {
+            else if (db_RESULT.pw == req.query.pw) {
                 //로그인 성공
                 console.log("[로그인]" + db_RESULT.name);
-                console.log("[전송]" + JSON.stringify(db_RESULT));
-                res.end(JSON.stringify(db_RESULT));
+                res.send(JSON.stringify(db_RESULT));
             }
+        });
+    } else {
+        res.send({
+            "error": "login_null"
         });
     }
 });
 
 //회원가입 요청
 app.post('/signup', function (req, res) {
-    if (req.body.id && req.body.pw && req.body.email && req.body.name && req.body.sex) {
+    if (req.query.id && req.query.pw && req.query.email && req.query.name && req.query.sex) {
         //DB에서 검색합니다. >> 아이디 또는 닉네임 또는 이메일이 중복되는가?
         USER_DATABASE.findOne({
             $or: [{
-                id: req.body.id
+                id: req.query.id
             }, {
-                name: req.body.name
+                name: req.query.name
             }, {
-                email: req.body.email
+                email: req.query.email
             }]
         }, function (e, db_RESULT) {
+            console.log(db_RESULT);
             if (e)
                 throw e;
-            else if (db_RESULT.id == req.body.id) {
+            else if (db_RESULT != null && db_RESULT.id == req.query.id) {
                 //아이디 중복
-                console.log("[중복]" + req.body.id + "은 존재하는 아이디");
-                res.end(1);
-            } else if (db_RESULT.name == req.body.name) {
+                console.log("[중복]" + req.query.id + "은 존재하는 아이디");
+                res.send({
+                    "error": "id_over"
+                });
+            } else if (db_RESULT != null && db_RESULT.name == req.query.name) {
                 // 닉네임 중복
-                console.log("[중복]" + req.body.name + "은 존재하는 닉네임");
-                res.end(2);
-            } else if (db_RESULT.email == req.body.email) {
+                console.log("[중복]" + req.query.name + "은 존재하는 닉네임");
+                res.send({
+                    "error": "name_over"
+                });
+            } else if (db_RESULT != null && db_RESULT.email == req.query.email) {
                 // 이메일 중복
-                console.log("[중복]" + req.body.email + "은 존재하는 이메일");
-                res.end(3);
+                console.log("[중복]" + req.query.email + "은 존재하는 이메일");
+                res.send({
+                    "error": "email_over"
+                });
             } else {
                 // 성공
-                console.log("[회원가입]" + req.body.id + " | " + req.body.name);
-                new USER_DATABASE({
-                    id: req.body.id // 아이디 
-                    , pw: req.body.pw // 비밀번호   
-                    , email: req.body.email // 이메일    
-                    , name: req.body.name // 닉네임
-                    , sex: req.body.sex, //성별
+                console.log("[회원가입]" + req.query.id + " | " + req.query.name);
+                var data = new USER_DATABASE({
+                    id: req.query.id, // 아이디 
+                    pw: req.query.pw, // 비밀번호   
+                    email: req.query.email, // 이메일    
+                    name: req.query.name, // 닉네임
+                    sex: req.query.sex, //성별
                     joinopinion: null // 참여한 찬반의견
-                }).save(function (e) {
+                });
+                data.save(function (e) {
                     if (e)
                         throw e;
                 });
-                res.end(4);
+                res.send(JSON.stringify(data));
             }
         });
     } else {
         //빈칸 존재
-        res.end(0);
+        res.send({
+            "error": "signup_null"
+        });
     }
 });
 
 //게시글 리스트 요청
 app.post('/bulletinlist', function (req, res) {
-    if (req.body.please == 1) { // 최신순
+    if (req.query.please == 1) { // 최신순
+        console.log("[리스트 요청] 최신순");
         BULLETIN_DATABASE.find({}).sort({
             date: -1
         }).limit(20).exec(function (e, db_RESULT) {
-            res.end(JSON.stringify(db_RESULT));
+            res.send(JSON.stringify(db_RESULT));
         });
-    } else if (req.body.please == 2) { // 핫 스팟
+    } else if (req.query.please == 2) { // 핫 스팟
+        console.log("[리스트 요청] 핫스팟");
         BULLETIN_DATABASE.find({}).sort({
             click: -1
         }).limit(20).exec(function (e, db_RESULT) {
-            res.end(JSON.stringify(db_RESULT));
+            res.send(JSON.stringify(db_RESULT));
         });
-    } else if (req.body.please == 3) { // 진행률
+    } else if (req.query.please == 3) { // 진행률
+        console.log("[리스트 요청] 진행률");
         BULLETIN_DATABASE.find({}).sort({
             current: -1
         }).limit(20).exec(function (e, db_RESULT) {
-            res.end(JSON.stringify(db_RESULT));
+            res.send(JSON.stringify(db_RESULT));
         });
     }
+});
+
+app.post('/clicked', function (req, res) {
+    BULLETIN_DATABASE.findOne({
+        id: req.query.bulletinid
+    }, function (e, db_RESULT) {
+        if(e)
+            throw e;
+        else if(db_RESULT != null){
+            ++db_RESULT.click;
+            db_RESULT.save(function(e){
+                if (e)
+                    throw e;
+            });
+        }
+    });
 });
 
 //게시글 작성 요청
@@ -212,49 +245,28 @@ app.post('/writebulletin', function (req, res) {
         if (e)
             throw e;
         else {
-            console.log("[작성중]ㅁㄴㅇ");
-            new BULLETIN_DATABASE({
+            var data = new BULLETIN_DATABASE({
                 id: c + 1, // 게시글 번호
                 time: new Date, // 작성 시간
-                title: req.body.title, // 제목
-                content: req.body.bulletincontent, // 내용
+                title: req.query.title, // 제목
+                content: req.query.bulletincontent, // 내용
                 click: 0, // 조회수
-                option: req.body.option, // 익명성 여부
+                option: Boolean(req.query.option), // 익명성 여부
                 current: 0, // 진행 정도
-                select: req.body.bulletinselect, // 자유 발언 1 | 찬반 토론 2 | 투표 3
+                select: parseInt(req.query.bulletinselect), // 자유 발언 1 | 찬반 토론 2 | 투표 3
                 like: 0, // 공감 수
-                tag: req.body.tag, // 태그
+                tag: req.query.tag, // 태그
                 //img: filePath, // 이미지
-                settime: req.body.exittime, // 종료 시간
-                vote: 0, //투표 수  vote[0] == 찬성 | vote[1] == 반대
+                //settime: req.query.exittime, // 종료 시간
+                vote: new Array[2], //투표 수  vote[0] == 찬성 | vote[1] == 반대
                 comment: null // 댓글
-            }).save(function (e) {
+            });
+            data.save(function (e) {
                 if (e)
                     throw e;
             });
-        }
-    });
-});
-
-//댓글 작성요청
-app.post('/writecomment', function (req, res) {
-    COMMENT_DATABASE.count({
-        bulletinid: req.body.bulletinid
-    }, function (e, c) {
-        if (e)
-            throw e;
-        else {
-            new COMMENT_DATABASE({
-                bulletinid: req.body.bulletinid // 게시글 번호 
-                , id: c + 1, // 댓글 번호
-                time: new Date, //작성 시간
-                name: req.body.name, // 닉네임
-                content: req.body.commentcontent, // 내용
-                like: 0 // 공감 수
-            }).save(function (e) {
-                if (e)
-                    throw e;
-            });
+            //데이터를 전송합니다.
+            res.end(JSON.stringify(data));
         }
     });
 });
@@ -262,30 +274,63 @@ app.post('/writecomment', function (req, res) {
 //댓글 보기 요청
 app.post('/seecomment', function (req, res) {
     COMMENT_DATABASE.find({
-        bulletinid: req.body.bulletinid
+        bulletinid: req.query.bulletinid
     }).sort({
         date: -1
     }).limit(15).exec(function (e, db_RESULT) {
         if (e)
             throw e;
         else
-            res.end(db_RESULT);
+            res.send(db_RESULT);
+    });
+});
+
+//댓글 작성요청
+app.post('/writecomment', function (req, res) {
+    COMMENT_DATABASE.count({
+        bulletinid: req.query.bulletinid
+    }, function (e, c) {
+        if (e)
+            throw e;
+        else {
+            var data = new COMMENT_DATABASE({
+                bulletinid: parseInt(req.query.bulletinid), // 게시글 번호 
+                id: c + 1, // 댓글 번호
+                time: new Date, //작성 시간
+                name: req.query.name, // 닉네임
+                content: req.query.commentcontent, // 내용
+                like: 0 // 공감 수
+            });
+            data.save(function (e) {
+                if (e)
+                    throw e;
+            });
+            res.send(JSON.stringify(data));
+        }
     });
 });
 
 //투표 요청
 app.post('/vote', function (req, res) {
     BULLETIN_DATABASE.findOne({
-        id: req.body.bulletinid
+        id: req.query.bulletinid
     }, function (e, db_RESULT) {
         if (e)
             throw e;
         else {
-            if (db_RESULT.votejoin.indexOf(req.body.name) == -1) {
-                if (req.body.vote == 0)
+            if (db_RESULT.votejoin.indexOf(req.query.name) == -1) {
+                db_RESULT.votejoin.push(req.query.name);
+                if (req.query.vote == 0) {
                     ++db_RESULT.vote[0];
-                else
+                } else {
                     ++db_RESULT.vote[1];
+                }
+                db_RESULT.save(function (err) {
+                    res.send({
+                        "error": "vote_fail"
+                    });
+                });
+                res.send(db_RESULT.vote);
             }
         }
     });
@@ -295,38 +340,40 @@ app.post('/vote', function (req, res) {
 //의견 보기 요청
 app.post('/seeopinion', function (req, res) {
     OPINION_DATABASE.find({
-        bulletinid: req.body.bulletinid
+        bulletinid: req.query.bulletinid
     }).sort({
         date: -1
     }).limit(15).exec(function (e, db_RESULT) {
         if (e)
             throw e;
         else
-            res.end(db_RESULT);
+            res.send(db_RESULT);
     });
 });
 
 //의견 작성 요청
 app.post('/writeopinion', function (req, res) {
     OPINION_DATABASE.count({
-        select: req.body.opinionselect
+        select: req.query.opinionselect
     }, function (e, c) {
         if (e)
             throw e;
         else {
-            if (req.body.joincomment.indexOf(req.body.bulletinid) == -1) {
-                new OPINION_DATABASE({
-                    bulletinid: req.body.bulletinid, // 게시글 번호    
+            if (req.query.joincomment.indexOf(req.query.bulletinid) == -1) {
+                var data = new OPINION_DATABASE({
+                    bulletinid: parseInt(req.query.bulletinid), // 게시글 번호    
                     id: c + 1, // 의견 번호
                     time: new Date, // 작성 시간
-                    name: req.body.name, // 닉네임
-                    content: req.body.opinioncontent, // 내용
+                    name: req.query.name, // 닉네임
+                    content: req.query.opinioncontent, // 내용
                     like: 0, // 공감 수
-                    select: req.body.opinionselect // 찬성 1 | 반대 2
-                }).save(function (e) {
+                    select: parseInt(req.query.opinionselect) // 찬성 1 | 반대 2
+                });
+                data.save(function (e) {
                     if (e)
                         throw e;
                 });
+                res.send(data);
             }
         }
     });
@@ -334,43 +381,59 @@ app.post('/writeopinion', function (req, res) {
 
 //공감 요청
 app.post('/like', function (req, res) {
-    if (req.body.what == "bulletin") {
+    if (req.query.what == "bulletin") {
         BULLETIN_DATABASE.findOne({
-            id: req.body.bulletinid
+            id: req.query.bulletinid
         }, function (e, db_RESULT) {
             if (e)
                 throw e;
             else {
-                if (db_RESULT.likejoin.indexOf(req.body.name) == -1)
+                if (db_RESULT.likejoin.indexOf(req.query.name) == -1)
                     ++db_RESULT.like;
                 else
                     --db_RESULT.like;
+                db_RESULT.save(function (e) {
+                    if (e)
+                        throw e;
+                });
+                res.send(db_RESULT.like);
             }
         });
-    } else if (req.body.what == "comment") {
+    } else if (req.query.what == "comment") {
         COMMENT_DATABASE.findOne({
-            id: req.body.commentid
+            id: req.query.commentid
         }, function (e, db_RESULT) {
             if (e)
                 throw e;
             else {
-                if (db_RESULT.likejoin.indexOf(req.body.name) == -1)
+                if (db_RESULT.likejoin.indexOf(req.query.name) == -1)
                     ++db_RESULT.like;
                 else
                     --db_RESULT.like;
+                db_RESULT.save(function (e) {
+                    if (e)
+                        throw e;
+                });
+                res.send(db_RESULT.like);
             }
         });
-    } else if (req.body.what == "opinion") {
+    } else
+    if (req.query.what == "opinion") {
         OPINION_DATABASE.findOne({
-            id: req.body.opinionid
+            id: req.query.opinionid
         }, function (e, db_RESULT) {
             if (e)
                 throw e;
             else {
-                if (db_RESULT.likejoin.indexOf(req.body.name) == -1)
+                if (db_RESULT.likejoin.indexOf(req.query.name) == -1)
                     ++db_RESULT.like;
                 else
                     --db_RESULT.like;
+                db_RESULT.save(function (e) {
+                    if (e)
+                        throw e;
+                });
+                res.send(db_RESULT.like);
             }
         });
     }
