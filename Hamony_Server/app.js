@@ -15,7 +15,7 @@ var server = http.createServer(app).listen(port, function () {
 });
 var mongoose = require('mongoose');
 var fs = require('fs');
-var done = false;
+var formidable = require('formidable');
 
 // uncomment after placing your favicon in /public
 //app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
@@ -28,8 +28,6 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 
-
-//app.use(multer());
 /*{
 dest: './image/'
 , rename: function (fieldname, filename) {
@@ -114,6 +112,9 @@ var BULLETIN_DATABASE = mongoose.model('Bulletin', Bulletin_Schema, "Bulletin");
 var COMMENT_DATABASE = mongoose.model('Comment', Comment_Schema, "Comment");
 var OPINION_DATABASE = mongoose.model('Opinion', Opinion_Schema, "Opinion");
 
+
+
+
 //로그인 요청
 app.post('/login', function (req, res) {
 	if (req.query.id && req.query.pw) {
@@ -133,7 +134,7 @@ app.post('/login', function (req, res) {
 				console.log("[로그인]" + db_RESULT.name);
 				res.send(JSON.stringify({
 					"error": null
-					, "data": JSON.stringify(db_RESULT)
+					, "data": db_RESULT
 				}));
 			} else if (db_RESULT.pw != req.query.pw) {
 				console.log("[로그인] 비밀번호 틀림");
@@ -228,7 +229,7 @@ app.post('/bulletinlist', function (req, res) {
 			} else
 				res.send({
 					"list": true
-					, "data": JSON.stringify(db_RESULT)
+					, "data": db_RESULT
 				});
 		});
 	} else if (req.query.please == 2) { // 핫 스팟
@@ -243,7 +244,7 @@ app.post('/bulletinlist', function (req, res) {
 			} else
 				res.send({
 					"list": true
-					, "data": JSON.stringify(db_RESULT)
+					, "data": db_RESULT
 				});
 		});
 	} else if (req.query.please == 3) { // 진행률
@@ -258,7 +259,7 @@ app.post('/bulletinlist', function (req, res) {
 			} else
 				res.send({
 					"list": true
-					, "data": JSON.stringify(db_RESULT)
+					, "data": db_RESULT
 				});
 		});
 	} else {
@@ -294,31 +295,72 @@ app.post('/writebulletin', function (req, res) {
 		if (e)
 			throw e;
 		else {
-			var data = new BULLETIN_DATABASE({
-				id: c + 1, // 게시글 번호
-				time: new Date, // 작성 시간
-				title: req.query.title, // 제목
-				content: req.query.bulletincontent, // 내용
-				click: 0, // 조회수
-				option: Boolean(req.query.option), // 익명성 여부
-				current: 0, // 진행 정도
-				select: parseInt(req.query.bulletinselect), // 자유 발언 1 | 찬반 토론 2 | 투표 3
-				like: 0, // 공감 수
-				tag: req.query.tag.split(','), // 태그
-				//img: filePath, // 이미지
-				//settime: req.query.exittime, // 종료 시간
-				vote: new Array(0, 0), //투표 수  vote[0] == 찬성 | vote[1] == 반대
-				comment: null // 댓글
+			var form = new formidable.IncomingForm();
+			form.parse(req, function (err, fields, files) {
+				console.log(files);
+				console.log(fields);
+				if (Object.keys(files).length ==0) {
+					var data = new BULLETIN_DATABASE({
+						id: c + 1, // 게시글 번호
+						time: new Date, // 작성 시간
+						title: req.query.title, // 제목
+						content: req.query.bulletincontent, // 내용
+						click: 0, // 조회수
+						option: Boolean(req.query.option), // 익명성 여부
+						current: 0, // 진행 정도
+						select: parseInt(req.query.bulletinselect), // 자유 발언 1 | 찬반 토론 2 | 투표 3
+						like: 0, // 공감 수
+						tag: req.query.tag.split(','), // 태그
+						img: null, // 이미지
+						settime: req.query.exittime, // 종료 시간
+						vote: new Array(0, 0), //투표 수  vote[0] == 찬성 | vote[1] == 반대
+						comment: null // 댓글
+					});
+					data.save(function (e) {
+						if (e)
+							throw e;
+					});
+					//데이터를 전송합니다.
+					res.end(JSON.stringify(data));
+				} else {
+					fs.readFile(files.image.path, function (e, data) {
+						var dirname = "./image/";
+						var newPath = dirname + files.image.name;
+						fs.writeFile(newPath, data, function (e) {
+							if (e)
+								throw e;
+							else {
+								var data = new BULLETIN_DATABASE({
+									id: c + 1, // 게시글 번호
+									time: new Date, // 작성 시간
+									title: req.query.title, // 제목
+									content: req.query.bulletincontent, // 내용
+									click: 0, // 조회수
+									option: Boolean(req.query.option), // 익명성 여부
+									current: 0, // 진행 정도
+									select: parseInt(req.query.bulletinselect), // 자유 발언 1 | 찬반 토론 2 | 투표 3
+									like: 0, // 공감 수
+									tag: req.query.tag.split(','), // 태그
+									img: newPath, // 이미지
+									settime: req.query.exittime, // 종료 시간
+									vote: new Array(0, 0), //투표 수  vote[0] == 찬성 | vote[1] == 반대
+									comment: null // 댓글
+								});
+								data.save(function (e) {
+									if (e)
+										throw e;
+								});
+								//데이터를 전송합니다.
+								res.end(JSON.stringify(data));
+							}
+						});
+					});
+				}
 			});
-			data.save(function (e) {
-				if (e)
-					throw e;
-			});
-			//데이터를 전송합니다.
-			res.end(JSON.stringify(data));
 		}
 	});
 });
+
 
 //댓글 보기 요청
 app.post('/seecomment', function (req, res) {
@@ -530,7 +572,5 @@ app.post('/like', function (req, res) {
 		});
 	}
 });
-
-
 
 module.exports = app;
